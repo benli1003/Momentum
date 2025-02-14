@@ -15,50 +15,152 @@ struct ContentView: View {
     @State private var selectedDueDate: Date = Date()   //store due date
     @State private var selectedTaskID: UUID? = nil      //store ID or nil
     @State private var selectedTask: Task? = nil        //stores the currently tapped task
+    @State private var filterOption: FilterOption = .all //default filter
+    @State private var sortAscending: Bool = true        //sort: true = Due First, false = Due Last
+    @State private var showFilterMenu: Bool = false
+    
+    //MARK: - enum for filter
+    enum FilterOption {
+        case all
+        case completed
+        case incomplete
+        case dueToday
+        case overdue
+        case upcoming
+    }
+    
+    //MARK: - filtering and sorting
+    var filteredAndSortedTasks: [Task] {
+        var result = tasks
+
+        // Filtering based on selected option
+        switch filterOption {
+        case .all:
+            break // Show all
+        case .completed:
+            result = result.filter { $0.isCompleted }
+        case .incomplete:
+            result = result.filter { !$0.isCompleted }
+        case .dueToday:
+            result = result.filter {
+                $0.dueDate != nil && Calendar.current.isDateInToday($0.dueDate!)
+            }
+        case .overdue:
+            result = result.filter {
+                $0.dueDate != nil && $0.dueDate! < Date()
+            }
+        case .upcoming:
+            result = result.filter {
+                $0.dueDate != nil && $0.dueDate! > Date()
+            }
+        }
+
+        // Sort tasks based on due date
+        result.sort { (task1, task2) -> Bool in
+            guard let date1 = task1.dueDate, let date2 = task2.dueDate else {
+                return sortAscending // Put tasks without due dates at the end
+            }
+            return sortAscending ? (date1 < date2) : (date1 > date2)
+        }
+
+        return result
+    }
 
     var body: some View {
         NavigationView {
-            VStack {
+            VStack(alignment: .leading) {
+                
+                //MARK: - filter and sort button
+                HStack {
+                    Spacer()
+                    Button(action: { showFilterMenu.toggle() }) {
+                        Image(systemName: "slider.horizontal.3") //icon for filter/sort
+                            .font(.title2)
+                    }
+                    .padding(.trailing)
+                }
+                
                 //MARK: - add new task section
                 HStack {
                     TextField("Enter new task...", text: $newTaskTitle)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())  //adds rounded border style to text field
-                        .padding(.leading, 10)
-
-                    Button(action: addTask) {                           //button to add a new task
-                        Image(systemName: "plus.circle.fill")          //plus icon
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                    
+                    Button(action: addTask) {
+                        Image(systemName: "plus.circle.fill")
                             .font(.title)
-                            .foregroundColor(newTaskTitle.isEmpty ? .gray : .blue) //button color changes based on input
+                            .foregroundColor(newTaskTitle.isEmpty ? .gray : .blue)
                     }
-                    .disabled(newTaskTitle.isEmpty)                    //disables button if text field is empty
+                    .disabled(newTaskTitle.isEmpty)
                 }
-                .padding()
+                .padding(.horizontal)
+
+               
+
+                // MARK: - filter & Sort Menu
+                if showFilterMenu {
+                    VStack {
+                        // Filter Picker
+                        Picker("Filter", selection: $filterOption) {
+                            Text("All").tag(FilterOption.all)
+                            Text("Completed").tag(FilterOption.completed)
+                            Text("Incomplete").tag(FilterOption.incomplete)
+                            Text("Due Today").tag(FilterOption.dueToday)
+                            Text("Overdue").tag(FilterOption.overdue)
+                            Text("Upcoming").tag(FilterOption.upcoming)
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                        .padding()
+                        
+                        //sorting Button
+                        Button(action: {
+                            sortAscending.toggle()
+                        }) {
+                            HStack {
+                                Text(sortAscending ? "Due First" : "Due Last")
+                                Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
+                            }
+                        }
+                        .padding()
+                        
+                        //close Button
+                        Button("Close") {
+                            showFilterMenu = false
+                        }
+                        .foregroundColor(.red)
+                        .padding()
+                    }
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.systemBackground)))
+                    .shadow(radius: 5)
+                    .padding()
+                }
                 
-                //MARK: - due date
+                //MARK: - due date picker
                 if let selectedTaskID = selectedTaskID, let taskIndex = tasks.firstIndex(where: { $0.id == selectedTaskID }) {
                     VStack {
                         Text("Due Date")
                             .font(.headline)
                             .padding()
-
+                        
                         DatePicker("Select Due Date", selection: Binding(
                             get: { tasks[taskIndex].dueDate ?? Date() },
                             set: { newDate in updateDueDate(for: taskIndex, to: newDate) }
                         ), displayedComponents: .date)
                         .datePickerStyle(GraphicalDatePickerStyle())
                         .padding()
-                        .opacity(tasks[taskIndex].dueDate == nil ? 0.5 : 1.0) // Dim if no due date is set
-
+                        .opacity(tasks[taskIndex].dueDate == nil ? 0.5 : 1.0)
+                        
                         HStack {
                             Button("Clear Due Date") {
-                                clearDueDate(for: taskIndex)  // Function to remove the due date
+                                clearDueDate(for: taskIndex)
                             }
                             .foregroundColor(.red)
-
+                            
                             Button("Close") {
                                 if let selectedTask = tasks.first(where: { $0.id == selectedTaskID }) {
-                                        selectTask(selectedTask)  // Call the function to toggle selection
-                                    }
+                                    selectTask(selectedTask)
+                                }
                             }
                             .padding()
                         }
@@ -67,24 +169,22 @@ struct ContentView: View {
                     .shadow(radius: 5)
                     .padding()
                 }
-
+                
                 //MARK: - task list
                 List {
-                    ForEach(tasks) { task in                           //loops through each task in the array
+                    ForEach(filteredAndSortedTasks) { task in
                         HStack {
-                            Button(action: {                           //toggle task completion when tapped
-                                toggleTaskCompletion(task) //marks task as complete/incomplete
-                            }) {
+                            Button(action: { toggleTaskCompletion(task) }) {
                                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(task.isCompleted ? .green : .gray) //green if completed
+                                    .foregroundColor(task.isCompleted ? .green : .gray)
                             }
-                            .buttonStyle(PlainButtonStyle()) // Removes button highlight effect
+                            .buttonStyle(PlainButtonStyle())
                             
                             VStack(alignment: .leading) {
-                                Text(task.title)                          //display the task title with a strikethrough if completed
+                                Text(task.title)
                                     .strikethrough(task.isCompleted, color: .gray)
                                     .foregroundColor(task.isCompleted ? .gray : .primary)
-                                    .animation(.easeInOut, value: task.isCompleted)         //smooth animation on completion toggle
+                                    .animation(.easeInOut, value: task.isCompleted)
                                 
                                 if let dueDate = task.dueDate {
                                     Text(formatDate(dueDate))
@@ -93,19 +193,19 @@ struct ContentView: View {
                                 }
                             }
                             .onTapGesture {
-                                selectTask(task) //opens the date picker
+                                selectTask(task)
                             }
                         }
                     }
-                    .onDelete(perform: deleteTask)                    //enables swipe-to-delete functionality
-
+                    .onDelete(perform: deleteTask)
                 }
-                .listStyle(PlainListStyle())                          //plain list style for cleaner look
+                .listStyle(PlainListStyle())
             }
-            .navigationTitle("Momentum Tasks")                        //title displayed in the navigation bar
+            .padding(.top, 10)
+            .navigationTitle("Momentum Tasks") // ✅ Now correctly placed
         }
     }
-
+        
     //MARK: - task management functions
 
     //add new task to list
