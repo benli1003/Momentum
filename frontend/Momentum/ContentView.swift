@@ -1,19 +1,13 @@
 import SwiftUI
+import Foundation //task struct in the api file
 
-//MARK: - task model
-struct Task: Identifiable {
-    let id = UUID()             //unique identifier for each task
-    var title: String           //the task description
-    var isCompleted: Bool       //boolean to track if the task is completed
-    var dueDate: Date?          //optional due date
-}
 
 struct ContentView: View {
     //MARK: - state variables
     @State private var tasks: [Task] = []               //array to hold the list of tasks
     @State private var newTaskTitle: String = ""        //input field value for adding a new task
     @State private var selectedDueDate: Date = Date()   //store due date
-    @State private var selectedTaskID: UUID? = nil      //store ID or nil
+    @State private var selectedTaskID: Int? = nil      //store ID or nil
     @State private var selectedTask: Task? = nil        //stores the currently tapped task
     @State private var filterOption: FilterOption = .all //default filter
     @State private var sortAscending: Bool = true        //sort: true = Due First, false = Due Last
@@ -202,7 +196,11 @@ struct ContentView: View {
                 .listStyle(PlainListStyle())
             }
             .padding(.top, 10)
-            .navigationTitle("Momentum Tasks") // ✅ Now correctly placed
+            .navigationTitle("Momentum Tasks")
+            .onAppear {
+                fetchTasks()
+            }
+
         }
     }
         
@@ -210,10 +208,37 @@ struct ContentView: View {
 
     //add new task to list
     func addTask() {
-        let newTask = Task(title: newTaskTitle, isCompleted: false)   //create a new task
-        tasks.append(newTask)                                        //add it to the tasks array
-        newTaskTitle = ""                                            //clear the input field after adding
+        let token = Secrets.jwtToken
+
+        APIManager.shared.createTask(title: newTaskTitle, token: token) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let newTask):
+                    tasks.append(newTask)
+                    newTaskTitle = ""
+                case .failure(let error):
+                    print("Failed to create task:", error.localizedDescription)
+                }
+            }
+        }
     }
+    
+    //get tasks
+    func fetchTasks() {
+        let token = Secrets.jwtToken
+
+        APIManager.shared.fetchTasks(token: token) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let fetchedTasks):
+                    self.tasks = fetchedTasks
+                case .failure(let error):
+                    print("Failed to fetch tasks:", error.localizedDescription)
+                }
+            }
+        }
+    }
+
 
     //toggles the completion status of a task
     func toggleTaskCompletion(_ task: Task) {
