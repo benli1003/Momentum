@@ -17,4 +17,4 @@ __pycache__/
 *.sql
 *.sql.gz
 
-Momentum/Momentum/Secrets.swift
+Momentum/Momentum/secret.swift
