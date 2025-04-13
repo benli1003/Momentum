@@ -9,6 +9,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.py[cod]
+*.cpython-*
+
 
 #macOS system
 .DS_Store
@@ -17,4 +20,5 @@ __pycache__/
 *.sql
 *.sql.gz
 
-Momentum/Momentum/secret.swift
+frontend/Momentum/secret.swift
+**/secret.swift
