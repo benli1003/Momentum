@@ -1,0 +1,4 @@
+struct Secrets {
+    static let jwtToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0NjA0Njg4LCJpYXQiOjE3NDQzNDIyMDQsImp0aSI6IjczODQyNGZlZmMxNDRhM2RiYjQwYWRlMjRmZjIyYmZhIiwidXNlcl9pZCI6MX0.YwWR3SLVOY1EMFQpP08GZYyD_RbOP6S1EmCXplp6C5o"
+}
+

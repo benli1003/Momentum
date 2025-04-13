@@ -138,9 +138,13 @@ struct ContentView: View {
                             .padding()
                         
                         DatePicker("Select Due Date", selection: Binding(
-                            get: { tasks[taskIndex].dueDate ?? Date() },
-                            set: { newDate in updateDueDate(for: taskIndex, to: newDate) }
+                            get: { selectedDueDate },
+                            set: { newDate in
+                                selectedDueDate = newDate
+                                updateDueDate(for: taskIndex, to: newDate)
+                            }
                         ), displayedComponents: .date)
+
                         .datePickerStyle(GraphicalDatePickerStyle())
                         .padding()
                         .opacity(tasks[taskIndex].dueDate == nil ? 0.5 : 1.0)
@@ -174,18 +178,23 @@ struct ContentView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(task.title)
                                     .strikethrough(task.isCompleted, color: .gray)
                                     .foregroundColor(task.isCompleted ? .gray : .primary)
                                     .animation(.easeInOut, value: task.isCompleted)
-                                
+
                                 if let dueDate = task.dueDate {
-                                    Text(formatDate(dueDate))
-                                        .font(.subheadline)
+                                    Text("Due: \(formatDate(dueDate))")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("No due date")
+                                        .font(.caption)
                                         .foregroundColor(.gray)
                                 }
                             }
+
                             .onTapGesture {
                                 selectTask(task)
                             }
@@ -242,35 +251,108 @@ struct ContentView: View {
 
     //toggles the completion status of a task
     func toggleTaskCompletion(_ task: Task) {
-        if let index = tasks.firstIndex(where: { $0.id == task.id }) { //find the index of the task
-            tasks[index].isCompleted.toggle()                          //toggle its completion status
+        APIManager.shared.updateTask(
+            id: task.id,
+            title: nil,
+            isCompleted: !task.isCompleted,
+            dueDate: nil,
+            token: Secrets.jwtToken
+        ) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let updatedTask):
+                    if let index = tasks.firstIndex(where: { $0.id == updatedTask.id }) {
+                        tasks[index] = updatedTask
+                    }
+                case .failure(let error):
+                    print("Failed to update task:", error.localizedDescription)
+                }
+            }
         }
     }
 
     //deletes tasks from the list based on their index
     func deleteTask(at offsets: IndexSet) {
-        tasks.remove(atOffsets: offsets)                              //remove the task(s) at the specified index
+        for index in offsets {
+            let taskToDelete = filteredAndSortedTasks[index]
+            
+            // Remove it from the main tasks array using its ID
+            if let originalIndex = tasks.firstIndex(where: { $0.id == taskToDelete.id }) {
+                let task = tasks[originalIndex]
+                APIManager.shared.deleteTask(id: task.id, token: Secrets.jwtToken) { result in
+                    DispatchQueue.main.async {
+                        switch result {
+                        case .success:
+                            tasks.remove(at: originalIndex)
+                            tasks = tasks
+                        case .failure(let error):
+                            print("Failed to delete task:", error.localizedDescription)
+                        }
+                    }
+                }
+            }
+        }
     }
+
+
     
     //set due date for tasks
     func selectTask(_ task: Task) {
         if selectedTaskID == task.id {
             selectedTaskID = nil
-        }
-        else {
+        } else {
             selectedTaskID = task.id
+            selectedDueDate = task.dueDate ?? Date()
         }
     }
+
     
-    //update due date
     func updateDueDate(for index: Int, to newDate: Date) {
-        tasks[index].dueDate = newDate
+        let task = tasks[index]
+
+        APIManager.shared.updateTask(
+            id: task.id,
+            title: nil,
+            isCompleted: nil,
+            dueDate: newDate,
+            token: Secrets.jwtToken
+        ) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let updatedTask):
+                    tasks[index] = updatedTask
+                case .failure(let error):
+                    print("Failed to update due date:", error.localizedDescription)
+                }
+            }
+        }
     }
+
 
     //clear due date
     func clearDueDate(for index: Int) {
-        tasks[index].dueDate = nil
+        let task = tasks[index]
+
+        APIManager.shared.updateTask(
+            id: task.id,
+            title: nil,
+            isCompleted: nil,
+            dueDate: nil,
+            token: Secrets.jwtToken
+        ) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let updatedTask):
+                    tasks[index] = updatedTask
+                    selectedDueDate = Date()
+                case .failure(let error):
+                    print("Failed to clear due date:", error.localizedDescription)
+                }
+            }
+        }
     }
+
+
 
     //format date
     func formatDate(_ date: Date) -> String {

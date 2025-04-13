@@ -5,6 +5,7 @@ class Task(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)    #user
     title = models.CharField(max_length=255)                    #title
     is_completed = models.BooleanField(default=False)           #when the task is completed
+    due_date = models.DateTimeField(null=True, blank=True)      #when the task is due
     created_at = models.DateTimeField(auto_now_add=True)        #when the task is created
     updated_at = models.DateTimeField(auto_now=True)            #when the task is updated
 
